@@ -568,10 +568,11 @@ export default function FastSLAMViz() {
     });
 
     let finalParticles = newParticles;
+    let Neff = NUM_P;
     if (visible.length > 0) {
       const normW = normLogWeights(logws);
       normW.forEach((w, i) => { finalParticles[i].w = w; });
-      const Neff = 1 / normW.reduce((s, w) => s + w * w, 0);
+      Neff = 1 / normW.reduce((s, w) => s + w * w, 0);
       if (Neff < NUM_P / 2) finalParticles = lowVarResample(finalParticles);
     }
 
@@ -581,6 +582,7 @@ export default function FastSLAMViz() {
       history:   [...simRef.current.history.slice(-200), newPose],
       stepN:     simRef.current.stepN + 1,
       agg:       aggregateMap(finalParticles),
+      Neff,
     };
     tick();
   }, [mModel, slamMode, motionNoise, sigmaR, sigmaB, sensorRange, tick]);
@@ -605,13 +607,15 @@ export default function FastSLAMViz() {
       history:   [{ ...INIT_POSE }],
       stepN:     0,
       agg:       null,
+      Neff:      NUM_P,
     };
     tick();
   }, [initMode, tick]);
 
   // Derived stats for the stats bar
-  const { pose, particles, stepN, agg } = simRef.current;
+  const { pose, particles, stepN, agg, Neff: storedNeff } = simRef.current;
   const st        = particleStats(particles);
+  const Neff      = storedNeff ?? NUM_P;
   const seenCount = agg ? agg.filter(l => l.mu).length : 0;
   const avgUncert = agg
     ? agg.filter(l => l.mu).reduce((s, l) => s + l.sigma[0] + l.sigma[3], 0) / Math.max(1, seenCount)
@@ -672,7 +676,7 @@ export default function FastSLAMViz() {
             {[
               ['STEP',   stepN,                                         0],
               ['SEEN',   `${seenCount}/${NL}`,                          1],
-              ['N_eff',  `${st.Neff.toFixed(0)}/${NUM_P}`,              2],
+              ['N_eff',  `${Neff.toFixed(0)}/${NUM_P}`,              2],
               ['AVG σ²', avgUncert.toFixed(3),                          3],
               ['TRUE',   `(${pose.x.toFixed(1)},${pose.y.toFixed(1)})`, 4],
               ['EST',    `(${st.mx.toFixed(1)},${st.my.toFixed(1)})`,   5],
